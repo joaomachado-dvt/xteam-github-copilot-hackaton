@@ -6,8 +6,7 @@ namespace Bookstore
 	{
 		private const string QUIT = "quit";
 		private readonly IConsole console;
-
-		private IList<Book> Books = new List<Book>();
+		private readonly IBookRepository repository;
 
 		private IReadOnlyDictionary<int, string> CategoryDictionary = new Dictionary<int, string>
 		{
@@ -19,16 +18,20 @@ namespace Bookstore
 			{ 6, "Biography" }
 		};
 
-		private long lastId = 0;
-
 		public static void Main(string[] args)
 		{
 			new Bookstore(new RealConsole()).Run();
 		}
 
 		public Bookstore(IConsole console)
+			: this(console, new InMemoryBookRepository())
+		{
+		}
+
+		public Bookstore(IConsole console, IBookRepository repository)
 		{
 			this.console = console;
+			this.repository = repository;
 		}
 
 		public void Run()
@@ -92,13 +95,15 @@ namespace Bookstore
 
 		private void HandleShow()
 		{
-			if (!Books.Any())
+			var books = repository.GetAll();
+
+			if (!books.Any())
 			{
 				console.WriteLine("No books in catalog.");
 				return;
 			}
 
-			foreach (var book in Books) {
+			foreach (var book in books) {
 				console.WriteLine("[{0}] {1}: {2} {3}", book.Id, book.Title, book.Author, (book.IsDiscontinued ? "(discontinued)" : ""));
 			}
 			console.WriteLine();
@@ -144,7 +149,7 @@ namespace Bookstore
 
 		private void AddBook(string book, string author, string category, string description)
 		{
-			if (Books.Any(b => b.Title == book))
+			if (repository.TitleExists(book))
 			{
 				console.WriteLine("Duplicate book with the name \"{0}\".", book);
 				return;
@@ -160,15 +165,7 @@ namespace Bookstore
 				return;
 			}
 
-			Books.Add(new Book
-			{
-				Id = NextId(),
-				Title = book,
-				CategoryId = categoryId,
-				Description = description,
-				Author = author,
-				IsDiscontinued = false
-			});
+			repository.Add(book, author, categoryId, description);
 		}
 
 		private void HandleDiscontinueBook(DiscontinueBookCommand command)
@@ -180,7 +177,7 @@ namespace Bookstore
 				return;
 			}
 
-			var identifiedBook = Books.FirstOrDefault(book => book.Id == id);
+			var identifiedBook = repository.FindById(id);
 			if (identifiedBook is null)
 			{
 				console.WriteLine("Book not found with id: {0}", id);
@@ -207,17 +204,18 @@ namespace Bookstore
 				return;
 			}
 
+			var books = repository.GetAll();
 			bool foundAny = false;
 
-			for (int j = 0; j < Books.Count; j++)
+			for (int j = 0; j < books.Count; j++)
 			{
-				Book currentBook = Books[j];
+				Book currentBook = books[j];
 
 				if (string.Equals(currentBook.Author.Trim(), authorName, StringComparison.OrdinalIgnoreCase))
 				{
 					if (currentBook.IsDiscontinued == false)
 					{
-						Books[j].IsDiscontinued = true;
+						books[j].IsDiscontinued = true;
 						foundAny = true;
 
 						console.WriteLine("Discontinued: '{0}' from author {1} (ID: {2})", currentBook.Title, currentBook.Author, currentBook.Id);
@@ -246,11 +244,6 @@ namespace Bookstore
 		private void Error(string command)
 		{
 			console.WriteLine("I don't know what the command \"{0}\" is.", command);
-		}
-
-		private long NextId()
-		{
-			return ++lastId;
 		}
 
 		private interface ICommand;
