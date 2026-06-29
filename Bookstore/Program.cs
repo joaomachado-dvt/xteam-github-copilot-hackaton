@@ -1,4 +1,6 @@
-﻿using Tasks;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Tasks;
 
 namespace Bookstore
 {
@@ -20,7 +22,17 @@ namespace Bookstore
 
 		public static void Main(string[] args)
 		{
-			new Bookstore(new RealConsole()).Run();
+			using var host = Host
+				.CreateDefaultBuilder(args)
+				.ConfigureServices(services =>
+				{
+					services.AddSingleton<IConsole, RealConsole>();
+					services.AddSingleton<IBookRepository, InMemoryBookRepository>();
+					services.AddSingleton<Bookstore>();
+				})
+				.Build();
+
+			host.Services.GetRequiredService<Bookstore>().Run();
 		}
 
 		public Bookstore(IConsole console)
