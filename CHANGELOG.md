@@ -4,6 +4,43 @@ All notable changes to this project are documented in this file.
 
 ## [2026-06-29]
 
+### Added
+
+- Author management actions:
+	- Added `addAuthor <id> <name> <bornDateYYYY-MM-DD> [awardsCommaSeparated]`.
+	- Added `showAuthors` with id/name/born date/awards output.
+	- Added `Author` model and `IAuthorRepository` + `InMemoryAuthorRepository`.
+	- Added unknown-author fallback identity (`Id = 0`, `Name = "Unknown Author"`).
+	- Where:
+		- [Bookstore/Author.cs](Bookstore/Author.cs)
+		- [Bookstore/IAuthorRepository.cs](Bookstore/IAuthorRepository.cs)
+		- [Bookstore/InMemoryAuthorRepository.cs](Bookstore/InMemoryAuthorRepository.cs)
+		- [Bookstore/Program.cs](Bookstore/Program.cs)
+
+### Changed
+
+- Book-author relation now includes `AuthorId` reference:
+	- Extended `Book` with `AuthorId`.
+	- Updated `IBookRepository`/`InMemoryBookRepository` add contract to store `AuthorId` and author name.
+	- `show` now resolves displayed author name from author repository and ensures fallback for missing references.
+	- `discontinueAuthor` now matches via repository-backed author identity.
+	- Help output includes new author commands.
+	- Where:
+		- [Bookstore/Book.cs](Bookstore/Book.cs)
+		- [Bookstore/IBookRepository.cs](Bookstore/IBookRepository.cs)
+		- [Bookstore/InMemoryBookRepository.cs](Bookstore/InMemoryBookRepository.cs)
+		- [Bookstore/Program.cs](Bookstore/Program.cs)
+
+### Tests
+
+- Added/updated behavior tests for:
+	- `addAuthor` success, duplicate id, invalid date, and reserved id 0.
+	- `showAuthors` empty and populated output.
+	- Missing-book-author fallback creation and reuse.
+	- Existing command behavior alignment after author reference changes.
+	- Where:
+		- [tests/Bookstore.Tests/UnitTest1.cs](tests/Bookstore.Tests/UnitTest1.cs)
+
 ### Changed
 
 - Command handling made safe (no index crashes):

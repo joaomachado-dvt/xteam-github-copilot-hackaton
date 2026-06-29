@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Tasks;
+using System.Globalization;
 
 namespace Bookstore
 {
@@ -9,6 +10,7 @@ namespace Bookstore
 		private const string QUIT = "quit";
 		private readonly IConsole console;
 		private readonly IBookRepository repository;
+		private readonly IAuthorRepository authorRepository;
 
 		private IReadOnlyDictionary<int, string> CategoryDictionary = new Dictionary<int, string>
 		{
@@ -28,6 +30,7 @@ namespace Bookstore
 				{
 					services.AddSingleton<IConsole, RealConsole>();
 					services.AddSingleton<IBookRepository, InMemoryBookRepository>();
+					services.AddSingleton<IAuthorRepository, InMemoryAuthorRepository>();
 					services.AddSingleton<Bookstore>();
 				})
 				.Build();
@@ -36,14 +39,15 @@ namespace Bookstore
 		}
 
 		public Bookstore(IConsole console)
-			: this(console, new InMemoryBookRepository())
+			: this(console, new InMemoryBookRepository(), new InMemoryAuthorRepository())
 		{
 		}
 
-		public Bookstore(IConsole console, IBookRepository repository)
+		public Bookstore(IConsole console, IBookRepository repository, IAuthorRepository authorRepository)
 		{
 			this.console = console;
 			this.repository = repository;
+			this.authorRepository = authorRepository;
 		}
 
 		public void Run()
@@ -91,6 +95,12 @@ namespace Bookstore
 				case AddCommand add:
 					HandleAdd(add);
 					return;
+				case AddAuthorCommand addAuthor:
+					HandleAddAuthor(addAuthor);
+					return;
+				case ShowAuthorsCommand:
+					HandleShowAuthors();
+					return;
 				case DiscontinueBookCommand discontinueBook:
 					HandleDiscontinueBook(discontinueBook);
 					return;
@@ -116,7 +126,10 @@ namespace Bookstore
 			}
 
 			foreach (var book in books) {
-				console.WriteLine("[{0}] {1}: {2} {3}", book.Id, book.Title, book.Author, (book.IsDiscontinued ? "(discontinued)" : ""));
+				var author = authorRepository.FindById(book.AuthorId) ?? authorRepository.EnsureUnknownAuthor();
+				book.AuthorId = author.Id;
+				book.Author = author.Name;
+				console.WriteLine("[{0}] {1}: {2} {3}", book.Id, book.Title, author.Name, (book.IsDiscontinued ? "(discontinued)" : ""));
 			}
 			console.WriteLine();
 		}
@@ -177,7 +190,98 @@ namespace Bookstore
 				return;
 			}
 
-			repository.Add(book, author, categoryId, description);
+			var referencedAuthor = authorRepository.FindByName(author);
+			if (referencedAuthor is null)
+			{
+				referencedAuthor = authorRepository.EnsureUnknownAuthor();
+			}
+
+			repository.Add(book, referencedAuthor.Id, referencedAuthor.Name, categoryId, description);
+		}
+
+		private void HandleAddAuthor(AddAuthorCommand command)
+		{
+			var parts = command.Arguments.Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length < 3)
+			{
+				console.WriteLine("Usage: addAuthor <id> <name> <bornDateYYYY-MM-DD> [awardsCommaSeparated]");
+				return;
+			}
+
+			if (!int.TryParse(parts[0], out var id))
+			{
+				console.WriteLine("Invalid author id: {0}", parts[0]);
+				return;
+			}
+
+			if (id == InMemoryAuthorRepository.UnknownAuthorId)
+			{
+				console.WriteLine("Author id 0 is reserved for Unknown Author.");
+				return;
+			}
+
+			var name = parts[1].Trim();
+			if (string.IsNullOrWhiteSpace(name))
+			{
+				console.WriteLine("Author name is required.");
+				return;
+			}
+
+			var bornDateText = parts[2];
+			if (!DateOnly.TryParseExact(bornDateText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var bornDate))
+			{
+				console.WriteLine("Invalid born date. Use YYYY-MM-DD.");
+				return;
+			}
+
+			if (authorRepository.IdExists(id))
+			{
+				console.WriteLine("Duplicate author id: {0}", id);
+				return;
+			}
+
+			var awards = Array.Empty<string>();
+			if (parts.Length >= 4)
+			{
+				awards = parts[3]
+					.Split(',')
+					.Select(value => value.Trim())
+					.Where(value => !string.IsNullOrWhiteSpace(value))
+					.ToArray();
+			}
+
+			var created = authorRepository.Create(new Author
+			{
+				Id = id,
+				Name = name,
+				BornDate = bornDate,
+				Awards = awards
+			});
+
+			if (!created)
+			{
+				console.WriteLine("Duplicate author id: {0}", id);
+				return;
+			}
+
+			console.WriteLine("Author created: {0} - {1}", id, name);
+		}
+
+		private void HandleShowAuthors()
+		{
+			var authors = authorRepository.GetAll();
+			if (!authors.Any())
+			{
+				console.WriteLine("No authors in catalog.");
+				return;
+			}
+
+			foreach (var author in authors)
+			{
+				var awards = author.Awards.Any() ? string.Join(",", author.Awards) : "none";
+				console.WriteLine("[{0}] {1} | Born: {2:yyyy-MM-dd} | Awards: {3}", author.Id, author.Name, author.BornDate, awards);
+			}
+			console.WriteLine();
 		}
 
 		private void HandleDiscontinueBook(DiscontinueBookCommand command)
@@ -219,18 +323,24 @@ namespace Bookstore
 			var books = repository.GetAll();
 			bool foundAny = false;
 
+			var author = authorRepository.FindByName(authorName);
+
 			for (int j = 0; j < books.Count; j++)
 			{
 				Book currentBook = books[j];
+				if (author is null)
+				{
+					continue;
+				}
 
-				if (string.Equals(currentBook.Author.Trim(), authorName, StringComparison.OrdinalIgnoreCase))
+				if (currentBook.AuthorId == author.Id)
 				{
 					if (currentBook.IsDiscontinued == false)
 					{
 						books[j].IsDiscontinued = true;
 						foundAny = true;
 
-						console.WriteLine("Discontinued: '{0}' from author {1} (ID: {2})", currentBook.Title, currentBook.Author, currentBook.Id);
+						console.WriteLine("Discontinued: '{0}' from author {1} (ID: {2})", currentBook.Title, author.Name, currentBook.Id);
 					}
 				}
 			}
@@ -245,7 +355,9 @@ namespace Bookstore
 		{
 			console.WriteLine("Commands:");
 			console.WriteLine("  show");
+			console.WriteLine("  showAuthors");
 			console.WriteLine("  add <title> <author> <category> <description>");
+			console.WriteLine("  addAuthor <id> <name> <bornDateYYYY-MM-DD> [awardsCommaSeparated]");
 			console.WriteLine("  discontinueBook <id>");
 			console.WriteLine("  discontinueAuthor <author>");
 			console.WriteLine("  help");
@@ -267,6 +379,10 @@ namespace Bookstore
 		private sealed record HelpCommand : ICommand;
 
 		private sealed record AddCommand(string Arguments) : ICommand;
+
+		private sealed record AddAuthorCommand(string Arguments) : ICommand;
+
+		private sealed record ShowAuthorsCommand : ICommand;
 
 		private sealed record DiscontinueBookCommand(string IdText) : ICommand;
 
@@ -292,10 +408,16 @@ namespace Bookstore
 				{
 					case "show":
 						return new ShowCommand();
+					case "showAuthors":
+						return new ShowAuthorsCommand();
 					case "add":
 						return commandRest.Length < 2
 							? new InvalidUsageCommand("Usage: add <title> <author> <category> <description>")
 							: new AddCommand(commandRest[1]);
+					case "addAuthor":
+						return commandRest.Length < 2
+							? new InvalidUsageCommand("Usage: addAuthor <id> <name> <bornDateYYYY-MM-DD> [awardsCommaSeparated]")
+							: new AddAuthorCommand(commandRest[1]);
 					case "discontinueBook":
 						return commandRest.Length < 2
 							? new InvalidUsageCommand("Usage: discontinueBook <id>")

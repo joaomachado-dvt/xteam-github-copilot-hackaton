@@ -76,7 +76,9 @@ Type `quit` to exit.
 ### Implemented command names
 
 - `show`
+- `showAuthors`
 - `add <title> <author> <category> <description>`
+- `addAuthor <id> <name> <bornDateYYYY-MM-DD> [awardsCommaSeparated]`
 - `discontinueBook <id>`
 - `discontinueAuthor <author>`
 - `help`
@@ -86,6 +88,8 @@ Type `quit` to exit.
 
 ```text
 add Dune Herbert Fiction Classic
+addAuthor 12 Herbert 1980-11-02 Nobel,Booker
+showAuthors
 show
 discontinueBook 1
 discontinueAuthor Herbert
@@ -97,6 +101,7 @@ Notes:
 - Category must match one of: `Fiction`, `Romance`, `Science Fiction`, `Fantasy`, `Mystery`, `Biography`
 - Category and description can contain spaces (for example: `Science Fiction` and `Classic space saga`)
 - Current parser treats the first token as title and second token as author
+- If a book author is not found, the app automatically uses fallback author `Unknown Author` (id `0`)
 
 ## Docker
 

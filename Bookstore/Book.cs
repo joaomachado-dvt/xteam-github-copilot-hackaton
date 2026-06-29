@@ -4,6 +4,7 @@ public class Book
 {
     public long Id { get; set; }
     public required string Title { get; set; }
+    public int AuthorId { get; set; }
     public required string Author { get; set; }
     public int CategoryId { get; set; }
     public required string Description { get; set; }

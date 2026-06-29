@@ -61,3 +61,29 @@ printf 'show\nadd Dune Herbert Fiction Classic scifi\nshow\ndiscontinueBook 1\ns
 2. Consider persistence (file or database) beyond in-memory list.
 3. Improve parser UX for quoted args and richer command grammar.
 4. Consider exposing categories in help output dynamically from dictionary.
+
+## Author Actions Follow-up (2026-06-29)
+
+Implemented:
+
+1. Added author domain and repository:
+- `Author` entity with `Id`, `Name`, `BornDate`, `Awards`.
+- In-memory author repository with deterministic ordering and unknown-author fallback (`Id = 0`).
+
+2. Added commands:
+- `addAuthor <id> <name> <bornDateYYYY-MM-DD> [awardsCommaSeparated]`
+- `showAuthors`
+
+3. Added book-author reference behavior:
+- `Book` now includes `AuthorId`.
+- Book add/show/discontinue flows resolve authors through repository and fallback safely.
+
+4. Added/updated tests:
+- Author creation validation paths.
+- `showAuthors` empty/populated output.
+- Unknown-author fallback creation and reuse.
+
+Known constraints after implementation:
+
+1. `add` command still accepts author by name token (not explicit numeric author id input), then resolves to repository identity with fallback.
+2. Parser remains non-quote-aware for multi-token names unless underscores/comma encoding is used.

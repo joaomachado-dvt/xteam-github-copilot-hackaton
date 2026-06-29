@@ -20,13 +20,14 @@ public sealed class InMemoryBookRepository : IBookRepository
         return _books.Any(book => book.Title == title);
     }
 
-    public Book Add(string title, string author, int categoryId, string description)
+    public Book Add(string title, int authorId, string authorName, int categoryId, string description)
     {
         var book = new Book
         {
             Id = NextId(),
             Title = title,
-            Author = author,
+            AuthorId = authorId,
+            Author = authorName,
             CategoryId = categoryId,
             Description = description,
             IsDiscontinued = false
