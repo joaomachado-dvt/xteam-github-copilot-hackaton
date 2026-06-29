@@ -6,7 +6,7 @@ namespace Tasks
 	{
 		public string ReadLine()
 		{
-			return Console.ReadLine();
+			return Console.ReadLine() ?? string.Empty;
 		}
 
 		public void Write(string format, params object[] args)
