@@ -54,51 +54,43 @@ namespace Bookstore
 
 		private void Execute(string commandLine)
 		{
-			if (string.IsNullOrWhiteSpace(commandLine))
-			{
-				return;
-			}
+			var command = CommandParser.Parse(commandLine);
+			Handle(command);
+		}
 
-			var commandRest = commandLine.Split(" ".ToCharArray(), 2);
-			var command = commandRest[0];
-			switch (command) {
-			case "show":
-				Show();
-				break;
-			case "add":
-				if (commandRest.Length < 2)
-				{
-					console.WriteLine("Usage: add <title> <author> <category> <description>");
-					break;
-				}
-				Add(commandRest[1]);
-				break;
-			case "discontinueBook":
-				if (commandRest.Length < 2)
-				{
-					console.WriteLine("Usage: discontinueBook <id>");
-					break;
-				}
-				DiscontinueBook(commandRest[1]);
-				break;
-			case "discontinueAuthor":
-				if (commandRest.Length < 2)
-				{
-					console.WriteLine("Usage: discontinueAuthor <author>");
-					break;
-				}
-				DiscontinueByAuthor(commandRest[1]);
-				break;
-			case "help":
-				Help();
-				break;
-			default:
-				Error(command);
-				break;
+		private void Handle(ICommand command)
+		{
+			switch (command)
+			{
+				case EmptyCommand:
+					return;
+				case InvalidUsageCommand invalidUsage:
+					console.WriteLine(invalidUsage.Message);
+					return;
+				case UnknownCommand unknown:
+					Error(unknown.Name);
+					return;
+				case ShowCommand:
+					HandleShow();
+					return;
+				case AddCommand add:
+					HandleAdd(add);
+					return;
+				case DiscontinueBookCommand discontinueBook:
+					HandleDiscontinueBook(discontinueBook);
+					return;
+				case DiscontinueAuthorCommand discontinueAuthor:
+					HandleDiscontinueAuthor(discontinueAuthor);
+					return;
+				case HelpCommand:
+					HandleHelp();
+					return;
+				default:
+					throw new InvalidOperationException($"Unsupported command type: {command.GetType().Name}");
 			}
 		}
 
-		private void Show()
+		private void HandleShow()
 		{
 			if (!Books.Any())
 			{
@@ -112,9 +104,9 @@ namespace Bookstore
 			console.WriteLine();
 		}
 
-		private void Add(string commandLine)
+		private void HandleAdd(AddCommand command)
 		{
-			var subcommandRest = commandLine.Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+			var subcommandRest = command.Arguments.Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
 			if (subcommandRest.Length < 4)
 			{
 				console.WriteLine("Usage: add <title> <author> <category> <description>");
@@ -179,8 +171,9 @@ namespace Bookstore
 			});
 		}
 
-		private void DiscontinueBook(string idString)
+		private void HandleDiscontinueBook(DiscontinueBookCommand command)
 		{
+			var idString = command.IdText;
 			if (!long.TryParse(idString, out var id))
 			{
 				console.WriteLine("Invalid id: {0}", idString);
@@ -204,8 +197,9 @@ namespace Bookstore
 			console.WriteLine("Discontinued: '{0}' (ID: {1})", identifiedBook.Title, identifiedBook.Id);
 		}
 
-		public void DiscontinueByAuthor(string authorName)
+		private void HandleDiscontinueAuthor(DiscontinueAuthorCommand command)
 		{
+			var authorName = command.AuthorName;
 			authorName = authorName.Trim();
 			if (string.IsNullOrWhiteSpace(authorName))
 			{
@@ -215,7 +209,7 @@ namespace Bookstore
 
 			bool foundAny = false;
 
-			for (int j = 0; j <Books.Count; j++)
+			for (int j = 0; j < Books.Count; j++)
 			{
 				Book currentBook = Books[j];
 
@@ -237,7 +231,7 @@ namespace Bookstore
 			}
 		}
 
-		private void Help()
+		private void HandleHelp()
 		{
 			console.WriteLine("Commands:");
 			console.WriteLine("  show");
@@ -257,6 +251,60 @@ namespace Bookstore
 		private long NextId()
 		{
 			return ++lastId;
+		}
+
+		private interface ICommand;
+
+		private sealed record EmptyCommand : ICommand;
+
+		private sealed record ShowCommand : ICommand;
+
+		private sealed record HelpCommand : ICommand;
+
+		private sealed record AddCommand(string Arguments) : ICommand;
+
+		private sealed record DiscontinueBookCommand(string IdText) : ICommand;
+
+		private sealed record DiscontinueAuthorCommand(string AuthorName) : ICommand;
+
+		private sealed record UnknownCommand(string Name) : ICommand;
+
+		private sealed record InvalidUsageCommand(string Message) : ICommand;
+
+		private static class CommandParser
+		{
+			public static ICommand Parse(string commandLine)
+			{
+				if (string.IsNullOrWhiteSpace(commandLine))
+				{
+					return new EmptyCommand();
+				}
+
+				var commandRest = commandLine.Split(" ".ToCharArray(), 2);
+				var command = commandRest[0];
+
+				switch (command)
+				{
+					case "show":
+						return new ShowCommand();
+					case "add":
+						return commandRest.Length < 2
+							? new InvalidUsageCommand("Usage: add <title> <author> <category> <description>")
+							: new AddCommand(commandRest[1]);
+					case "discontinueBook":
+						return commandRest.Length < 2
+							? new InvalidUsageCommand("Usage: discontinueBook <id>")
+							: new DiscontinueBookCommand(commandRest[1]);
+					case "discontinueAuthor":
+						return commandRest.Length < 2
+							? new InvalidUsageCommand("Usage: discontinueAuthor <author>")
+							: new DiscontinueAuthorCommand(commandRest[1]);
+					case "help":
+						return new HelpCommand();
+					default:
+						return new UnknownCommand(command);
+				}
+			}
 		}
 	}
 }
