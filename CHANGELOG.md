@@ -117,6 +117,18 @@ All notable changes to this project are documented in this file.
 		- [Bookstore/InMemoryBookRepository.cs](Bookstore/InMemoryBookRepository.cs)
 		- [Bookstore/Program.cs](Bookstore/Program.cs)
 
+- Phase 4: Generic Host + dependency injection container wiring:
+	- Replaced direct app construction in `Main` with `Host.CreateDefaultBuilder(args)`.
+	- Registered services through container wiring:
+		- `IConsole` -> `RealConsole`
+		- `IBookRepository` -> `InMemoryBookRepository`
+		- `Bookstore` application service
+	- Resolved `Bookstore` from host service provider and executed command loop.
+	- Added required hosting and DI package references in project file.
+	- Where:
+		- [Bookstore/Program.cs](Bookstore/Program.cs)
+		- [Bookstore/Bookstore.csproj](Bookstore/Bookstore.csproj)
+
 ### Validation
 
 - The updated behavior was validated with:
@@ -133,6 +145,13 @@ make build-docker
 ```
 
 - Phase 3 verification:
+
+```bash
+dotnet build Bookstore.sln -nologo
+dotnet test Bookstore.sln -nologo
+```
+
+- Phase 4 verification:
 
 ```bash
 dotnet build Bookstore.sln -nologo
