@@ -68,6 +68,55 @@ All notable changes to this project are documented in this file.
 		- [README.md](README.md#L83)
 		- [README.md](README.md#L105)
 
+### Added
+
+- Phase 1: Testing foundation and automation:
+	- Added xUnit test project and solution wiring.
+	- Added behavior tests covering quit, show-empty, add/show, duplicate title, discontinue by id (invalid + success), discontinue by author, and help output.
+	- Added root `Makefile` automation targets:
+		- `build`
+		- `build-docker`
+		- `test`
+		- `test-coverage`
+		- `test-docker`
+		- `coverage-docker`
+	- Added Docker-based test and coverage execution using .NET SDK container.
+	- Where:
+		- [tests/Bookstore.Tests/UnitTest1.cs](tests/Bookstore.Tests/UnitTest1.cs)
+		- [tests/Bookstore.Tests/Bookstore.Tests.csproj](tests/Bookstore.Tests/Bookstore.Tests.csproj)
+		- [Bookstore.sln](Bookstore.sln)
+		- [Makefile](Makefile)
+
+- Phase 2: Typed command extraction from command loop:
+	- Extracted command parsing into `CommandParser.Parse(string)`.
+	- Introduced typed command objects:
+		- `ShowCommand`
+		- `AddCommand`
+		- `DiscontinueBookCommand`
+		- `DiscontinueAuthorCommand`
+		- `HelpCommand`
+		- `UnknownCommand`
+		- `InvalidUsageCommand`
+		- `EmptyCommand`
+	- Added centralized dispatch via `Handle(ICommand)` and moved execution into dedicated handlers.
+	- Preserved user-facing behavior and messages while reducing parsing/handling coupling.
+	- Where:
+		- [Bookstore/Program.cs](Bookstore/Program.cs)
+
+- Phase 3: Repository abstraction for storage and identity:
+	- Added repository contract `IBookRepository` for book storage operations.
+	- Added `InMemoryBookRepository` implementation managing:
+		- In-memory collection lifecycle
+		- ID generation (`NextId`)
+		- Lookup and duplicate-title checks
+	- Refactored `Bookstore` to depend on `IBookRepository` instead of owning direct storage state.
+	- Added constructor overload for repository injection while preserving default runtime behavior.
+	- Moved storage and id concerns out of command host flow in `Program.cs`.
+	- Where:
+		- [Bookstore/IBookRepository.cs](Bookstore/IBookRepository.cs)
+		- [Bookstore/InMemoryBookRepository.cs](Bookstore/InMemoryBookRepository.cs)
+		- [Bookstore/Program.cs](Bookstore/Program.cs)
+
 ### Validation
 
 - The updated behavior was validated with:
@@ -75,10 +124,22 @@ All notable changes to this project are documented in this file.
 ```bash
 dotnet build Bookstore/Bookstore.csproj -nologo
 printf 'show\nadd Dune Herbert Fiction Classic scifi\nshow\ndiscontinueBook 1\nshow\ndiscontinueAuthor Herbert\nhelp\nquit\n' | dotnet run --project Bookstore/Bookstore.csproj
+dotnet test Bookstore.sln -nologo
+make test
+make test-coverage
+make test-docker
+make coverage-docker
+make build-docker
+```
+
+- Phase 3 verification:
+
+```bash
+dotnet build Bookstore.sln -nologo
+dotnet test Bookstore.sln -nologo
 ```
 
 ### Open
 
-- Automated tests are not added yet.
-- Data persistence is still in-memory only.
+- Persistence remains in-memory only (`InMemoryBookRepository`); no durable backend yet.
 - Title and author parsing is still single-token (no quoted parsing yet).
