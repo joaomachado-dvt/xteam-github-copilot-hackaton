@@ -1,0 +1,7 @@
+﻿services:
+  bookstore:
+    image: bookstore
+    build:
+      context: .
+      dockerfile: Bookstore/Dockerfile
+
